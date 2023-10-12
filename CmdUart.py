@@ -41,7 +41,7 @@ class CmdUart:
         while try_cnt:
             try_cnt -= 1
             answer: str = self.send_cmd_and_get_reply(cmd)
-            # print("{0} {1}".format(Cmd, answer))
+            # print("{0} {1}".format(cmd, answer))
             if answer.lower().strip() == 'ok':
                 return True
         return False

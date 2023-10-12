@@ -1,7 +1,10 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QPushButton, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QGridLayout, QMessageBox, \
     QRadioButton, QFrame, QGroupBox, QCheckBox, QSpacerItem, QSizePolicy
+from CmdUart import CmdUart
 
+
+Uart = CmdUart()
 
 class QHLine(QFrame):
     def __init__(self):
@@ -16,6 +19,15 @@ class QVLine(QFrame):
         self.setFrameShape(QFrame.VLine)
         self.setFrameShadow(QFrame.Sunken)
 
+def TryConvert(txt: str):
+    try:
+        if txt.isnumeric():
+            v = int(txt)
+            return v
+    except ValueError:
+        pass
+    return None
+
 class HogCtrlWindow(QtWidgets.QWidget):
     def OnModeChange(self):
         if self.rbtnSheet.isChecked():
@@ -27,6 +39,30 @@ class HogCtrlWindow(QtWidgets.QWidget):
             self.cbSheetPollEn.setChecked(False)
             self.cbSheetPollEn.setEnabled(False)
             self.gbManual.setEnabled(True)
+
+    def SendPoints(self, pg, ps, pr, ph):
+        for i in range(0, 3):
+            rpl = Uart.send_cmd_and_get_reply("set {0} {1} {2} {3}".format(pg, ps, pr, ph))
+            print(rpl)
+            if "ok" in rpl.lower():
+                self.lblSta.setText("Ok")
+                self.lblGrif.setText(str(pg))
+                self.lblSlyze.setText(str(ps))
+                self.lblRave.setText(str(pr))
+                self.lblHuff.setText(str(ph))
+                return True
+        self.lblSta.setText("Sending fail")
+        return False
+
+    def OnApply(self):
+        try:
+            pg = int(self.edGrif.text())
+            ps = int(self.edSlyze.text())
+            pr = int(self.edRave.text())
+            ph = int(self.edHuff.text())
+        except ValueError:
+            return
+        self.SendPoints(pg, ps, pr, ph)
 
     def __init__(self):
         super().__init__()
@@ -47,7 +83,8 @@ class HogCtrlWindow(QtWidgets.QWidget):
         # Googlesheet settings
         gb2 = QGroupBox("Настройки гуглотаблицы")
         lblUrl = QLabel("URL таблицы:")
-        self.edSheetUrl = QLineEdit("https://docs.google.com/spreadsheets/d/15dcdgj4wC7PxBiPrd3yXb1rx570sCtQEPsK_vzpmmoA/edit?usp=sharing")
+        # self.edSheetUrl = QLineEdit("https://docs.google.com/spreadsheets/d/15dcdgj4wC7PxBiPrd3yXb1rx570sCtQEPsK_vzpmmoA/edit?usp=sharing")
+        self.edSheetUrl = QLineEdit("https://docs.google.com/spreadsheets/d/1VP880oA1ZxCTcJISrknymbvjjjLUlh9lBMdLnXp3d3Y/edit?usp=sharing")
         self.cbSheetPollEn = QCheckBox("Включить опрос")
         self.cbSheetPollEn.setChecked(False)
         self.cbSheetPollEn.setEnabled(False)
@@ -68,6 +105,7 @@ class HogCtrlWindow(QtWidgets.QWidget):
         self.edHuff = QLineEdit("0")
         self.edHuff.setMaximumSize(54, 20)
         self.btnApply = QPushButton("Применить")
+        self.btnApply.clicked.connect(self.OnApply)
         lt_Manual = QGridLayout()
         lt_Manual.addWidget(QLabel('Введите нужные значения и нажмите "Применить"'), 0, 0, 1, 4)
         lt_Manual.addWidget(QLabel("Гриффиндор"), 1, 0)
@@ -98,10 +136,21 @@ class HogCtrlWindow(QtWidgets.QWidget):
         lt_CurVal.addWidget(self.lblHuff, 1, 3)
         gb4.setLayout(lt_CurVal)
 
+        # Bottom status line
+        self.lblSta = QLabel()
+
         # Global layout
         lt_main = QVBoxLayout()
         lt_main.addWidget(gb1)
         lt_main.addWidget(gb2)
         lt_main.addWidget(self.gbManual)
         lt_main.addWidget(gb4)
+        lt_main.addWidget(self.lblSta)
+
         self.setLayout(lt_main)
+
+        if Uart.find_port():
+            self.lblSta.setText("Device found at " + Uart.ser.port)
+        else:
+            print("Device not found")
+            QMessageBox.critical(self, "Not Found", "Device not found")

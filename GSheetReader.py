@@ -18,17 +18,16 @@ class GSheetRdr:
         creds = Credentials.from_service_account_file("TableReader.json", scopes=scope)
         client = gspread.authorize(creds)
         # Get sheet
-        google_sh = client.open_by_url(
-            "https://docs.google.com/spreadsheets/d/15dcdgj4wC7PxBiPrd3yXb1rx570sCtQEPsK_vzpmmoA/edit?usp=sharing")
+        google_sh = client.open_by_url(self.url)
         self.sheet1 = google_sh.get_worksheet(0)
 
     def GetCellInt(self, cellstr):
         txt = self.sheet1.acell(cellstr).value
-        try:
-            if txt.isnumeric():
+        if txt:
+            try:
                 v = int(txt)
                 return v
-        except ValueError:
-            pass
+            except ValueError:
+                pass
         return None
 
