@@ -1,10 +1,12 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QPushButton, QLabel, QLineEdit, QHBoxLayout, QVBoxLayout, QGridLayout, QMessageBox, \
-    QRadioButton, QFrame, QGroupBox, QCheckBox, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QPushButton, QLabel, QLineEdit, QVBoxLayout, QGridLayout, QMessageBox, \
+    QRadioButton, QFrame, QGroupBox, QCheckBox
+from PyQt5.QtGui import QIntValidator
 from CmdUart import CmdUart
 
 
 Uart = CmdUart()
+
 
 class QHLine(QFrame):
     def __init__(self):
@@ -19,6 +21,7 @@ class QVLine(QFrame):
         self.setFrameShape(QFrame.VLine)
         self.setFrameShadow(QFrame.Sunken)
 
+
 def TryConvert(txt: str):
     try:
         if txt.isnumeric():
@@ -28,19 +31,21 @@ def TryConvert(txt: str):
         pass
     return None
 
+
 class HogCtrlWindow(QtWidgets.QWidget):
     def OnModeChange(self):
-        if self.rbtnSheet.isChecked():
-            if not self.cbSheetPollEn.isEnabled():
-                self.cbSheetPollEn.setChecked(False)
-                self.cbSheetPollEn.setEnabled(True)
+        if self.rbtnServer.isChecked():
+            if not self.cbServerPollEn.isEnabled():
+                self.cbServerPollEn.setChecked(False)
+                self.cbServerPollEn.setEnabled(True)
                 self.gbManual.setEnabled(False)
         else:
-            self.cbSheetPollEn.setChecked(False)
-            self.cbSheetPollEn.setEnabled(False)
+            self.cbServerPollEn.setChecked(False)
+            self.cbServerPollEn.setEnabled(False)
             self.gbManual.setEnabled(True)
 
     def SendPoints(self, pg, ps, pr, ph):
+        # Try several times
         for i in range(0, 3):
             rpl = Uart.send_cmd_and_get_reply("set {0} {1} {2} {3}".format(pg, ps, pr, ph))
             print(rpl)
@@ -53,6 +58,9 @@ class HogCtrlWindow(QtWidgets.QWidget):
                 return True
         self.lblSta.setText("Sending fail")
         return False
+
+    def GetPoints(self):
+        return int(self.lblGrif.text()), int(self.lblSlyze.text()), int(self.lblRave.text()), int(self.lblHuff.text())
 
     def OnApply(self):
         try:
@@ -70,28 +78,48 @@ class HogCtrlWindow(QtWidgets.QWidget):
 
         # Top switch
         gb1 = QGroupBox("Режим")
-        self.rbtnSheet = QRadioButton("Автоматический из гуглотаблицы")
-        self.rbtnSheet.clicked.connect(self.OnModeChange)
+        self.rbtnServer = QRadioButton("Автоматический с сервера")
+        self.rbtnServer.clicked.connect(self.OnModeChange)
         rbtnManual = QRadioButton("Ручной ввод")
         rbtnManual.setChecked(True)
         rbtnManual.clicked.connect(self.OnModeChange)
         lt_Mode = QVBoxLayout()
-        lt_Mode.addWidget(self.rbtnSheet)
+        lt_Mode.addWidget(self.rbtnServer)
         lt_Mode.addWidget(rbtnManual)
         gb1.setLayout(lt_Mode)
 
-        # Googlesheet settings
-        gb2 = QGroupBox("Настройки гуглотаблицы")
-        lblUrl = QLabel("URL таблицы:")
-        # self.edSheetUrl = QLineEdit("https://docs.google.com/spreadsheets/d/15dcdgj4wC7PxBiPrd3yXb1rx570sCtQEPsK_vzpmmoA/edit?usp=sharing")
-        self.edSheetUrl = QLineEdit("https://docs.google.com/spreadsheets/d/1VP880oA1ZxCTcJISrknymbvjjjLUlh9lBMdLnXp3d3Y/edit?usp=sharing")
-        self.cbSheetPollEn = QCheckBox("Включить опрос")
-        self.cbSheetPollEn.setChecked(False)
-        self.cbSheetPollEn.setEnabled(False)
+        # ==== Remote settings ====
+        gb2 = QGroupBox("Настройки сервера")
+        lblUrl = QLabel("URL:")
+        self.edServerUrl = QLineEdit("http://158.160.52.182:8050/get-scores")
+        # Request period
+        lblReqPeriod = QLabel("Период опроса:")
+        self.edReqPeriod = QLineEdit("11")
+        self.edReqPeriod.setValidator(QIntValidator(1, 999, self))
+        lblSeconds = QLabel("с")
+        # Request timeout
+        lblReqTimeout = QLabel("Request Timeout:")
+        self.edReqTimeout = QLineEdit("9")
+        self.edReqTimeout.setValidator(QIntValidator(1, 999, self))
+        lblReqTimeoutSeconds = QLabel("s")
+        # Poll enable
+        self.cbServerPollEn = QCheckBox("Включить опрос")
+        self.cbServerPollEn.setChecked(False)
+        self.cbServerPollEn.setEnabled(False)
         lt_gsheet = QGridLayout()
-        lt_gsheet.addWidget(lblUrl, 0, 0)
-        lt_gsheet.addWidget(self.edSheetUrl, 0, 1)
-        lt_gsheet.addWidget(self.cbSheetPollEn, 1, 0)
+        # Url
+        lt_gsheet.addWidget(lblUrl, 0, 0, 1, 1)
+        lt_gsheet.addWidget(self.edServerUrl, 0, 1, 1, 2)
+        # Period
+        lt_gsheet.addWidget(lblReqPeriod, 1, 0)
+        lt_gsheet.addWidget(self.edReqPeriod, 1, 1)
+        lt_gsheet.addWidget(lblSeconds, 1, 2)
+        # Timeout
+        lt_gsheet.addWidget(lblReqTimeout, 2, 0)
+        lt_gsheet.addWidget(self.edReqTimeout, 2, 1)
+        lt_gsheet.addWidget(lblReqTimeoutSeconds, 2, 2)
+        # Switch
+        lt_gsheet.addWidget(self.cbServerPollEn, 3, 0, 1, 2)
         gb2.setLayout(lt_gsheet)
 
         # Manual values
@@ -149,8 +177,10 @@ class HogCtrlWindow(QtWidgets.QWidget):
 
         self.setLayout(lt_main)
 
+        # Try to connect
         if Uart.find_port():
             self.lblSta.setText("Device found at " + Uart.ser.port)
         else:
+            self.lblSta.setText("Device not found")
             print("Device not found")
-            QMessageBox.critical(self, "Not Found", "Device not found")
+            # QMessageBox.critical(self, "Not Found", "Device not found")
