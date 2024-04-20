@@ -10,7 +10,7 @@ PointsMinValue = -999
 PointsMaxValue = 9999
 
 
-def thd_auto_func(win: HogCtrlWindow):
+def ThdAutoFunc(win: HogCtrlWindow):
     was_active = False
     while True:
         if win.cbServerPollEn.isChecked():
@@ -33,17 +33,16 @@ def thd_auto_func(win: HogCtrlWindow):
             if rtimeout < 1:
                 rtimeout = 1
             try:
-                response = requests.get(win.edServerUrl.text(), timeout=rtimeout)
-                # response = requests.get(win.edServerUrl.text(), timeout=9)
+                srv_response = requests.get(win.edServerUrl.text(), timeout=rtimeout)
             except Exception as e:
                 win.lblSta.setText("Request failed")
                 print("Request exception: {0} {1!r}".format(type(e).__name__, e.args))
                 pass
                 continue
             # Request succeded somehow
-            if response.status_code == 200:
+            if srv_response.status_code == 200:
                 try:
-                    jsonstr = response.json()
+                    jsonstr = srv_response.json()
                     print(jsonstr)
                     win.lblSta.setText(jsonstr)
                     jpoints = json.loads(jsonstr)
@@ -51,18 +50,24 @@ def thd_auto_func(win: HogCtrlWindow):
                     srvs = int(jpoints["Slyze"])
                     srvr = int(jpoints["Rave"])
                     srvh = int(jpoints["Huff"])
+                    jshow_points = jpoints.get("ShowPoints")
+                    srv_show_points = 1
+                    if jshow_points is not None:
+                        srv_show_points = 0 if int(jshow_points) == 0 else 1
                     # Get current values and check if changed
                     currg, currs, currr, currh = win.GetPoints()
-                    if currg == srvg and currs == srvs and currr == srvr and currh == srvh:
+                    win_show_points = 1 if win.points_are_shown else 0
+                    if (currg == srvg and currs == srvs and currr == srvr and currh == srvh and
+                            win_show_points == srv_show_points):
                         print("Not changed.")
                     else:
                         # print(points_grif, points_slyze, points_rave, points_huff)
-                        win.SendPoints(srvg, srvs, srvr, srvh)
+                        win.SendPoints(srvg, srvs, srvr, srvh, srv_show_points)
                 except ValueError:
                     print("Error parsing json")
                     pass
             else:  # if response.status_code == 200
-                win.lblSta.setText("Error getting data: {}".format(response.status_code))
+                win.lblSta.setText("Error getting data: {}".format(srv_response.status_code))
         else:  # if win.cbServerPollEn.isChecked()
             was_active = False
             time.sleep(1)
@@ -72,7 +77,7 @@ def main():
     app = QtWidgets.QApplication([])
     window = HogCtrlWindow()
     window.show()
-    threading.Thread(target=thd_auto_func, args=(window,)).start()
+    threading.Thread(target=ThdAutoFunc, args=(window,)).start()
 
     app.exec()
 
